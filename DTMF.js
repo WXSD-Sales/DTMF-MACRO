@@ -3,6 +3,9 @@ import xapi from 'xapi';
 // This macro will auto answer any incoming call which matches
 // predefined regular expressions. Once answered, the macro
 // will send a DTFM tone of '1' to the connected call.
+// Created by William Mills and available to download at
+// https://github.com/WXSD-Sales/DTMF-MACRO
+
 // Thanks to Isidro Fernandez for the initial code which
 // this macro is built upon.
 
