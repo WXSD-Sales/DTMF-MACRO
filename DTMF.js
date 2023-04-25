@@ -1,178 +1,88 @@
+/*********************************************************
+ * 
+ * Author:           William Mills
+ *                   Technical Solutions Specialist 
+ *                   wimills@cisco.com
+ *                   Cisco Systems
+ * 
+ * Version: 1-0-0
+ * Released: 10/30/21
+ * 
+ * This Webex Device Macro automatically answers a call from
+ * specific callers and then sends DTMF tones to the far end.
+ * This is useful for situations where you want to add a
+ * Webex device to a conferance and it is required to
+ * send a DTMF verification to join.
+ * 
+ * Full Readme and source code available on Github:
+ * https://github.com/wxsd-sales/dtmf-macro
+ * 
+ ********************************************************/
+
 import xapi from 'xapi';
 
-// This macro will auto answer any incoming call which matches
-// predefined regular expressions. Once answered, the macro
-// will send a DTFM tone of '1' to the connected call.
-// Created by William Mills and available to download at
-// https://github.com/WXSD-Sales/DTMF-MACRO
+/*********************************************************
+ * Configure the settings below
+**********************************************************/
 
-// Thanks to Isidro Fernandez for the initial code which
-// this macro is built upon.
+const config = {
+  dtmfString: '1',    // The DTMF string which is send when the call is answered
+  expressions: [/^12345.*@example.com$/, // Array of regular express in which to auto answer for
+    /^43523.*@example.com$/,
+    /^.*1231232/,
+    /^03a0e04b/],
+  rejectOtherCalls: true // Reject any unmatched calls if set to true
+}
 
-// Create your array of regular expressions
-const AUTOANSWER_NUMBERS_REGEX = [/^12345.*@example.com$/, 
-                                  /^43523.*@example.com$/,
-                                  /^.*1231232/];
+/*********************************************************
+ * Below are the functions of this macro which process
+ * call and user interface events.
+**********************************************************/
 
-// Specify if you want this macro to automatically reject
-// any additional calls while in a call
-const REJECT_ADDITIONAL_CALLS = true;
+// Subscribe incoming call events and call status changes
+xapi.Event.IncomingCallIndication.on(processIncomingCall);
+xapi.Status.Call.on(processCall);
 
-
-///////////////////////////////////
-// Do not change anything below
-///////////////////////////////////
-
-// This is our variable for storing the current call information 
-var currentCall = {'CallId': '', 
-            'RemoteURI':'',
-};
+// Variable for storing the call Id which this macro has answered
+let callId;
 
 // This fuction will remove the SIP and Spark etc prefixes
-function normaliseRemoteURI(number){
+function normaliseRemoteURI(number) {
   var regex = /^(sip:|h323:|spark:|h320:|webex:|locus:)/gi;
   number = number.replace(regex, '');
   console.log('Normalised Remote URI to: ' + number);
   return number;
 }
 
-
 // Handles all incoming call events
-async function checkCall(event){
+async function processIncomingCall(event) {
 
-  console.log('Incoming call');
-  console.log(event);
+  console.log(`Incoming Call Event - CallId [${event.CallId}]`);
 
-  // If there is no current call, record it and answer it
-  if(currentCall['CallId'] == ''){
-   
-    // Check RemoteURI against regex numbers
+  const remoteURI = normaliseRemoteURI(event.RemoteURI)
 
-    const normalisedURI = normaliseRemoteURI(event.RemoteURI);
-
-    const isMatch = AUTOANSWER_NUMBERS_REGEX.some(rx => rx.test(normalisedURI));
-
-    if(isMatch){
-      answerCall(event);
-    } else {
-      console.log('Did not match Regex, call ignored');
-    }
-  
+  if (config.expressions.some(rx => rx.test(remoteURI))) {
+    console.log(`CallId [${event.CallId}] - Remote URI [${remoteURI}] is valid, answering`)
+    callId = event.CallId
+    xapi.Command.Call.Accept({ CallId: callId })
+      .catch(error => console.log('Unable to answer call: ' + error));
   } else {
-
-    // Reject the call if that is our preference 
-    if(REJECT_ADDITIONAL_CALLS){
-      console.log('Additional Call Rejected');
-      xapi.Command.Call.Reject(
-        { CallId: event.CallId });
-      return;
+    if (config.rejectOtherCalls) {
+      console.log(`CallId [${event.CallId}] - Remote URI [${remoteURI}] is invalid, rejecting`)
+      xapi.Command.Call.Reject({ CallId: event.CallId });
+    } else {
+      console.log(`CallId [${event.CallId}] - Remote URI [${remoteURI}] is invalid, ignoring`)
     }
-
-    // Otherwise ingnore incoming call
-    console.log('Ignoring this call')
-
-
-    // We won't bother to answer this additional call and let the system handle
-    // it with its default behaviour
   }
-
-
 }
 
-// We use this fuction to detect when the call has been fully answered
-function processCallAnswer(event){
+function processCall(event) {
+  // Only process calls which this macro answered
+  if (!event.hasOwnProperty('AnswerState')) return;
+  if (event.AnswerState != 'Answered') return;
+  if (event.id != callId) return;
 
-  // Log all Call Answerstate events
-  console.log(event);
-
-  console.log(currentCall);
-  
-  // Check that it is Answered is true, and also check
-  // that we are only sending a DTMF tone to the number 
-  // we auto answered
-  if(event == 'Answered' & currentCall['CallId'] != ''){
-    
-    console.log('Call Answered')
-
-    console.log('Sending DTMF to CallID: ' + currentCall['CallId'])
-
-    xapi.Command.Call.DTMFSend(
-    { CallId: currentCall['CallId'], DTMFString: '1'}).catch(
-      (error) =>{
-        console.error(error);
-      }
-    );
-
-  } 
-  
+  console.log(`CallId [${callId}] answered, sending DTMF string [${config.dtmfString}]`)
+  xapi.Command.Call.DTMFSend({ CallId: callId, DTMFString: config.dtmfString })
+    .catch((error) => console.log(`Unable to send DTMF string to CallId [${callId}] - Error: ${error}`));
 }
-
-
-// This fuction will store the current call information and answer the call
-function answerCall(event) {
-  
-  console.log('Answering call')
-  
-  // Store the call infomation for later processing
-  currentCall['CallId'] = event.CallId;
-  currentCall['RemoteURI'] = normaliseRemoteURI(event.RemoteURI);
-
-  xapi.Command.Call.Accept(
-    { CallId: event.CallId }).catch(
-      (error) =>{
-        console.error(error);
-      });
-
-}
-
-// This fuction will clear the current call information only for the call
-// which was auto answered by this macro
-function processCallDisconnect(event){
-
-  console.log('CallID: ' + event.CallId + ' Disconnected');
-
-  console.log(currentCall);
-
-  // If the current call is disconnecting, erase the cache
-  if(event.CallId == currentCall.CallId){
-  
-    console.log('Resetting Current Call variable');
-
-    currentCall.CallId = '';
-    currentCall.RemoteURI = '';
-
-  }
-
-  console.log(currentCall);
-
-}
-
-// This function runs first time when this macro starts. It is necessary for
-// the case where the macro was started when there was already an active call
-// on the system.
-async function checkForActiveCalls(){
-
-
-  const calls = await xapi.Status.SystemUnit.State.NumberOfActiveCalls.get();
-  console.log('Number of current calls: ' + calls);
-
-  if(calls == 1){
-
-    const value = await xapi.Status.Call.get();
-
-    currentCall.CallId = value[0].id;
-    currentCall.RemoteURI = normaliseRemoteURI(value[0].CallbackNumber);
-
-    console.log(currentCall);
-  }
-
-}
-
-// Run our async initial function
-checkForActiveCalls();
-
-
-// Subscribe our functions to the event and status changes
-xapi.Event.IncomingCallIndication.on(checkCall);
-xapi.Status.Call.AnswerState.on(processCallAnswer);
-xapi.Event.CallDisconnect.on(processCallDisconnect);
