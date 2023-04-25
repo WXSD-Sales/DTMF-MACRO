@@ -1,13 +1,29 @@
 # DTMF Macro
 
-This Webex Device Macro will automatically answer a call which matches the regular expression configured which is specified at the beginning of the file.
-After answering the call, the macro will then send a DTMF tone for the number '1' to the connected call.
+Welcome to our WXSD DEMO Repo!
 
-This is useful if you want a Webex Device to automatically answer and join a meetings system which has called it and requires DTMF verification.
+This Webex Device Macro automatically answers a call from specific callers and then sends DTMF tones to the far end. This is useful for situations where you want to add a Webex device to a conferance and it is required to send a DTMF verification to join.
 
-## Installation
-To install this macro on your Webex Device, you can log into its Web interface and upload it to the macro. Section.
-Once the macro is running, no further action is required.
+*Everything included is for demo and Proof of Concept purposes only. Your use of the site is solely at your own risk. This site may contain links to third party content, which we do not warrant, endorse, or assume liability for. These demos are for Cisco Webex usecases, but are not Official Cisco Webex Branded demos.
 
-![image](https://user-images.githubusercontent.com/21026209/139554212-2fc8da20-f737-42dd-a0c1-6ecda6ac187e.png)
+## Requirements
 
+1. Webex Device running RoomOS 9.15.x or above.
+2. Device Web Admin or Control Hub access to enable and upload the Macro.
+
+## Setup
+
+1. Download the ``dtmf.js`` file and upload it to your Webex Room device.
+2. Configure the Macro by changing the initial values, there are comments explaining each one.
+3. Enable the Macro.
+
+## Validation
+
+Validated Hardware:
+
+* Webex Room Kit Pro
+* Webex Desk Pro
+
+## Support
+
+Please reach out to the WXSD team at [wxsd@external.cisco.com](mailto:wxsd@external.cisco.com?subject=dtmf-macro)
